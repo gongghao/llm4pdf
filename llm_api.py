@@ -1,10 +1,7 @@
 import re
-import requests
 from typing import Tuple, List
-from vector_search import extract_relevant_context_advanced, extract_keywords_from_question
+from vector_search import extract_keywords_from_question
 from real_llm_api import call_llm_api, init_llm
-import os
-import fitz
 
 def translate_to_english(question_zh: str) -> str:
     """

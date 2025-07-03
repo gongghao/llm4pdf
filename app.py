@@ -1,7 +1,8 @@
 import streamlit as st
 import os
-from pdf_utils import extract_text, extract_large_images
-from llm_api import get_summary, ask_question, find_image_by_number, setup_llm_api
+from ppstructure_utils import PDFParser
+from llm_api import get_summary, ask_question, setup_llm_api
+from ImgUtil import is_meaningless_img, save_imgs
 import re
 
 st.set_page_config(page_title="PDF智能解读", layout="wide")
@@ -34,12 +35,13 @@ def main():
         with open(pdf_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
+        
         # 解析PDF
-        with st.spinner("正在解析PDF..."):
-            text= extract_text(pdf_path)
-            st.session_state['pdf_text'] = text
-            figures = extract_large_images(pdf_path)
-            st.session_state['figures'] = figures
+        with st.spinner("正在使用PPStructure提取PDF内容,时间较长请稍候..."):
+            pdf_parser = PDFParser(pdf_path)
+            pdf_parser.parse()
+            st.session_state['pdf_text'] = pdf_parser.markdown_texts
+            st.session_state['figures'] = pdf_parser.markdown_images
         
         # 显示文献总结
         st.header("📋 文献总结")
@@ -52,9 +54,16 @@ def main():
         if st.session_state.get('figures'):
             st.header("🖼️ PDF图片")
             cols = st.columns(3)
-            for i, fig in enumerate(st.session_state['figures']):
-                with cols[i % 3]:
-                    st.image(fig['img_path'], caption=f"图片 {i+1}")
+            img_count = 0
+            for page_dict in st.session_state['figures']:
+                if isinstance(page_dict, dict) and page_dict:
+                    for path, image in page_dict.items():
+                        if not is_meaningless_img(image):
+                            col = cols[img_count % 3]
+                            with col:
+                                st.image(image, caption=path)
+                            img_count += 1
+        save_imgs(st.session_state['figures'])
         
         # 问答界面
         st.header("💬 智能问答")
@@ -112,7 +121,11 @@ def main():
                         st.info(f"原文片段长度: {len(evidence)} 字符")
         
         # 清理临时文件
-        os.remove(pdf_path)
+        # os.remove(pdf_path)
+
+        # 清理 session_state
+        st.session_state['pdf_text'] = None
+        st.session_state['figures'] = None
 
 if __name__ == "__main__":
     main()

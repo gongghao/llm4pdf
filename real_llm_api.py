@@ -1,10 +1,7 @@
 import requests
-import json
-import time
-from typing import Dict, Any
 
 class LLMAPI:
-    def __init__(self, api_type: str = "qwen", api_key: str = None):
+    def __init__(self, api_type: str = "qwen", api_key: str = ""):
         """
         初始化大模型API
         api_type: "qwen", "doubao", "deepseek"
