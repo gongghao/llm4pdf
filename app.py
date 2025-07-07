@@ -1,13 +1,21 @@
 import streamlit as st
 import os
-from ppstructure_utils import PDFParser
-from llm_api import get_summary, ask_question, setup_llm_api
-from Img_util import save_imgs, is_meaningless_img, clear_imgs
+import fitz
+from llm_api import get_summary, ask_question, setup_llm_api, setup_vlm_api
 import re
 import gc
 from text_util import text_chunking
+from langchain_text_splitters import MarkdownHeaderTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from pdf_parser import  extract_text_and_images_from_pdf   
+
+os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
+os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
 
 st.set_page_config(page_title="PDF智能解读", layout="wide")
+
+
 
 def highlight_text(text, keywords):
     """高亮显示关键词"""
@@ -18,8 +26,12 @@ def highlight_text(text, keywords):
     return highlighted
 
 def main():
+    
+    # VLM API密钥配置
     # 这里填写你的API类型和密钥
-    # setup_llm_api("deepseek", "sk-2766c2e985dc4b568207f647a0056052")
+    if os.environ.get('VLM_API_KEY') is None:
+        setup_vlm_api("sk-95e87a0b2dee40e0b5ae7ae8ac2161ca")  # 请替换为你的实际API密钥
+        setup_llm_api("deepseek", "sk-2766c2e985dc4b568207f647a0056052")
     st.title("📚 PDF文档智能解读系统")
     
     # 侧边栏：PDF上传
@@ -29,6 +41,7 @@ def main():
         
         if uploaded_file:
             st.success(f"已上传: {uploaded_file.name}")
+    
     
     # 主界面
     if uploaded_file:
@@ -44,25 +57,49 @@ def main():
             st.session_state['pdf_text'] = None
             st.session_state['figures'] = None
 
-            with st.spinner("正在使用PPStructure提取PDF内容,时间较长请稍候（约半分钟）..."):
-                pdf_parser = PDFParser(pdf_path)
-                pdf_parser.parse()
-                st.session_state['pdf_text'] = pdf_parser.markdown_texts
-                st.session_state['figures'] = pdf_parser.markdown_images
+            with st.spinner("正在提取PDF内容"):
+
+                
+                # # 提取文本和图片描述
+                # combined_content, text_only = extract_text_and_images_from_pdf(pdf_path)
+                
+                # # 保存到session_state
+                # st.session_state['pdf_text'] = text_only
+                # st.session_state['pdf_file_name'] = uploaded_file.name
+                
+                # # 保存完整内容
+                # complete_text_path = f'pages/complete_text_with_images.md'
+                # os.makedirs('pages', exist_ok=True)
+                # with open(complete_text_path, 'w', encoding='utf-8') as f:
+                #     f.write(combined_content)
+                # st.success(f"已保存完整内容: {complete_text_path}")
+                
+                # # 文本向量化
+                # st.session_state['chunks'] = text_chunking(st.session_state['pdf_text'])
+                # embeddings = HuggingFaceEmbeddings(model_name="shibing624/text2vec-base-multilingual")
+                # vectorstore = Chroma.from_documents(documents=st.session_state['chunks'], embedding=embeddings, persist_directory="./chroma_db")
+                # print("vectordb:", vectorstore._collection.count())    
+                # 显示提取的内容
+                # st.header("📝 提取的内容（包含图片描述）")
+                # with st.expander("查看提取的内容", expanded=False):
+                #     st.text_area("PDF内容", combined_content, height=300)
+                
+                # 显示图片统计
+                # from pdf_parser import get_all_image_descriptions
+                # images = get_all_image_descriptions(combined_content)
+                # if images:
+                #     st.info(f"📸 检测到 {len(images)} 张图片")
+                #     for img in images:
+                #         st.write(f"图片 {img['number']}: {img['description'][:100]}...")
+                
+                
+                with open('./pages/complete_text_with_images.md', 'r', encoding='utf-8') as f:
+                    markdown_text = f.read()
+                st.session_state['pdf_text'] = markdown_text
                 st.session_state['pdf_file_name'] = uploaded_file.name
 
-                # 清理图片
-                clear_imgs();
-                # 保存图片
-                save_imgs(st.session_state['figures'])
 
-                # 处理文字
-                st.session_state['processed_text'] = text_chunking(st.session_state['pdf_text'])
-
-                del pdf_parser
-                gc.collect()
-        
-        if st.session_state.get('pdf_text') or st.session_state.get('figures'):
+        if st.session_state.get('pdf_text'):
             # 显示PDF图片
             # if st.session_state.get('figures'):
             #     st.header("🖼️ PDF图片")
@@ -77,9 +114,7 @@ def main():
             #                         st.image(image, caption=path)
             #                     img_count += 1
         
-            
-        
-        
+                    
 
             # 显示文献总结
             st.header("📋 文献总结")
@@ -115,34 +150,27 @@ def main():
             if question:
                 if st.button("提交问题"):
                     with st.spinner("正在思考..."):
-                        answer, evidence = ask_question(st.session_state['pdf_text'], question)
-                        
-                        # 检查问题是否涉及"第X张图片"
-                        match = re.search(r'第(\d+)张图片', question)
-                        if match and st.session_state.get('figures'):
-                            fig_num = int(match.group(1))
-                            if(1 <= fig_num <= len(os.listdir("./pics"))):
-                                st.subheader(f"🖼️ 第{fig_num}张图片")
-                                img_file = f"./pics/img_{fig_num}.png"
-                                st.image(img_file, caption=f"图片 {fig_num}")
-                        
-                        # 显示答案和原文依据
-                        col1, col2 = st.columns([1, 1])
-                        with col1:
-                            st.subheader("🤖 答案")
-                            st.write(answer)
-                        with col2:
-                            st.subheader("📖 原文依据")
-                            
-                            # 高亮显示关键词
-                            keywords = ['数据集', 'dataset', '实验', 'experiment', '方法', 'method', 
-                                    '结果', 'result', '创新', 'contribution', '图片', 'figure']
-                            highlighted_evidence = highlight_text(evidence, keywords)
-                            
-                            st.markdown(highlighted_evidence)
-                            
-                            # 显示原文长度信息
-                            st.info(f"原文片段长度: {len(evidence)} 字符")
+                        with open('./pages/complete_text_with_images.md', 'r', encoding='utf-8') as f:
+                            markdown_text = f.read()
+                        answer, evidence, is_image_question = ask_question(markdown_text, question)
+                        if is_image_question:
+                            col1, col2 = st.columns([1, 1])
+                            with col1:
+                                st.subheader("🤖 答案")
+                                st.write(answer)
+                            with col2:
+                                st.subheader("🖼️ 图片")
+                                st.image(evidence)
+                        else:
+                            col1, col2 = st.columns([1, 1])
+                            with col1:
+                                st.subheader("🤖 答案")
+                                st.write(answer)
+                            with col2:
+                                st.subheader("📖 原文依据")
+                                st.markdown(evidence)
+                                # 显示原文长度信息
+                                st.info(f"原文片段长度: {len(evidence)} 字符")
 
 if __name__ == "__main__":
     main()

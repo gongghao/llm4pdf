@@ -1,17 +1,13 @@
+
+from langchain_text_splitters import MarkdownHeaderTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+import os
+os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
+os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
+
 def text_chunking(markdown_text):
-    """
-    对传入的markdown文本进行分块、清洗等处理，返回处理后的文本或分块列表。
-    这里以按Markdown标题分块为例。
-    """
-    import re
-    chunks = []
-    pattern = re.compile(r'^(#+ .+)$', re.MULTILINE)
-    headings = [m for m in pattern.finditer(markdown_text)]
-    for i, h in enumerate(headings):
-        start = h.end()
-        end = headings[i+1].start() if i+1 < len(headings) else len(markdown_text)
-        title = h.group(1)
-        content = markdown_text[start:end].strip()
-        if content:
-            chunks.append({'title': title, 'content': content})
+    headers_to_split_on = [("#", "h1"), ("##", "h2"), ("###", "h3")]
+    markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+    chunks = markdown_splitter.split_text(markdown_text)
     return chunks
