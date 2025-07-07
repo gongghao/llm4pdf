@@ -111,16 +111,7 @@ class LLMAPI:
     
     def get_fallback_response(self, prompt: str) -> str:
         """备用响应（当API调用失败时）"""
-        if "总结" in prompt:
-            return "这是一篇关于深度学习的学术论文。论文提出了一种新的神经网络架构，在多个数据集上取得了优异的结果。主要创新点包括..."
-        elif "数据集" in prompt:
-            return "本文实验在以下数据集上完成：MNIST、CIFAR-10、ImageNet等经典数据集。"
-        elif "图片" in prompt:
-            return "第2张图片展示了模型架构图，显示了网络各层的连接方式和参数配置。"
-        elif "创新" in prompt:
-            return "本文的核心创新点在于提出了一种新的注意力机制，能够更好地处理长序列依赖关系。"
-        else:
-            return "根据原文内容，这个问题的答案是..."
+        return "api调用失败"
 
 # 全局LLM实例
 llm_instance = None

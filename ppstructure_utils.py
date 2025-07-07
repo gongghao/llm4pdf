@@ -1,21 +1,13 @@
 from pathlib import Path
 from paddleocr import PPStructureV3
 
-ppstructure_pipeline = None
-
-def get_ppstructure_pipeline():
-    global ppstructure_pipeline
-    if ppstructure_pipeline is None:
-        ppstructure_pipeline = PPStructureV3(
-            text_recognition_model_name="en_PP-OCRv4_mobile_rec",
-        )
-    return ppstructure_pipeline
-
 class PDFParser:
     def __init__(self, input_file: str):
         self.input_file = input_file
-        self.output_path = Path("./output")
-        self.pipeline = get_ppstructure_pipeline()
+        self.output_path = Path("./output_markdown")
+        self.pipeline = PPStructureV3(
+            text_recognition_model_name="en_PP-OCRv4_mobile_rec",
+        )
 
     def parse(self):
         output = self.pipeline.predict(self.input_file)
@@ -26,11 +18,9 @@ class PDFParser:
         markdown_images = []
 
         for res in output:
-            res.print()
             md_info = res.markdown
             markdown_list.append(md_info)
             markdown_images.append(md_info.get("markdown_images", {}))
-            print(md_info.get("markdown_tables"))
 
         markdown_texts = self.pipeline.concatenate_markdown_pages(markdown_list)
 
