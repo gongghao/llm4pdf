@@ -8,33 +8,67 @@ import numpy as np
 from typing import List, Dict, Any, Tuple
 import re
 import shutil
+import time
+import socket
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def extract_text_from_image(image_path, prompt="", api_key=None):
+def extract_text_from_image(image_path, file_path, description:bool, prompt="", api_key=None):
     """使用Qwen-VL-Max提取图片中的文本"""
-    try:
-        # 如果没有提供api_key，尝试从环境变量获取
-        if api_key is None:
-            import os
-            api_key = os.environ.get('VLM_API_KEY')
-            if not api_key:
-                return "错误：未提供API密钥"
-        
-        # 读取图片文件并转换为base64
-        with open(image_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-        
-        client = OpenAI(api_key = api_key, base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
-        completion = client.chat.completions.create(
-        model="qwen-vl-plus",  # 此处以qwen-vl-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/getting-started/models
-        messages=[{"role": "user","content": [
-            {"type": "image_url",
-             "image_url": {"url": f"data:image/jpeg;base64,{encoded_string}"}},
-            {"type": "text", "text": prompt},
-            ]}]
-    )
-        return completion.choices[0].message.content
-    except Exception as e:
-        return f"提取图片文本时出错: {str(e)}"
+    while True:
+        try:
+            # 如果没有提供api_key，尝试从环境变量获取
+            if api_key is None:
+                import os
+                api_key = os.environ.get('VLM_API_KEY')
+                if not api_key:
+                    return "错误：未提供API密钥"
+            
+            # 读取图片文件并转换为base64
+            with open(image_path, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+            
+            client = OpenAI(api_key = api_key, base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
+            completion = client.chat.completions.create(
+                model="qwen-vl-plus",  # 此处以qwen-vl-plus为例，可按需更换模型名称。模型列表：https://help.aliyun.com/zh/model-studio/getting-started/models
+                messages=[
+                    {
+                        "role": "system",
+                        "content": [{"type": "text", "text": prompt}],
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                "url": f"data:image/jpeg;base64,{encoded_string}"
+                            },
+                            },
+                            {"type": "text", "text": "请描述这张图片的内容"},
+                        ],
+                    },
+                ],
+                stream = True,
+            )
+
+            with open(file_path, 'a', encoding='utf-8') as f:
+                if description:
+                    splits = image_path.split('/')[-1].split('_')
+                    page_num = splits[1]
+                    image_index = splits[3]
+                    
+                    f.write(f"<PAGE_{page_num}_IMAGE_{image_index}>")
+                for chunk in completion:
+                    if chunk.choices:
+                        content = chunk.choices[0].delta.content
+                        if content is not None:
+                            f.write(content)
+                if description:
+                    f.write(f"</PAGE_{page_num}_IMAGE_{image_index}>\n")
+            return True
+        except Exception as e:
+            print("提取图片文本时出错: ",image_path, e)
+            
 
 def extract_images_from_pdf_page(page, page_num: int, img_idx_all: int) -> List[Dict[str, Any]]:
     """从PDF页面提取图像"""
@@ -66,16 +100,12 @@ def extract_images_from_pdf_page(page, page_num: int, img_idx_all: int) -> List[
         
     return images
 
-def describe_image_with_qwen(image_path: str, image_index: int, page_num: int) -> str:
+def describe_image_with_qwen(image_path: str, image_index: int):
     """使用Qwen-VL描述图片内容"""
     try:
         # 调用Qwen-VL API描述图片
-        description = extract_text_from_image(image_path, prompt="请描述这张图片的内容，不要输出任何其他信息。")
-        
-        # 添加特殊标识
-        formatted_description = f"<PAGE_{page_num}_IMAGE_{image_index + 1}>{description}</PAGE_{page_num}_IMAGE_{image_index + 1}>"
-        
-        return formatted_description
+        extract_text_from_image(image_path, f'pages/img_descriptions.md',description=True, prompt="请用简洁的语言描述这张图片的内容，不要输出任何其他信息。")
+
     except Exception as e:
         print(f"图片描述失败: {e}")
         return f"<IMAGE_{image_index}>[图片内容描述失败]</IMAGE_{image_index}>"
@@ -91,26 +121,26 @@ def extract_text_and_images_from_pdf(pdf_path: str) -> Tuple[str, str]:
         shutil.rmtree("temp_images")
     if os.path.exists("pages"):
         shutil.rmtree("pages")
+    os.makedirs("pages", exist_ok=True)
+    with open('pages/img_descriptions.md', 'w', encoding='utf-8') as f:
+        f.truncate(0)
 
     img_idx = 1
-    for page_num in range(len(doc)):
-        page = doc.load_page(page_num)
-        
-        # 提取文本
-        pix = page.get_pixmap(dpi=150)
-        page_image = 'pages/page_'+str(page_num+1)+'.png'
-        os.makedirs("pages", exist_ok=True)
-        pix.save(page_image)
-        page_text = extract_text_from_image(page_image, prompt="请提取图片中的所有文本内容，包括标题、正文、图表标题、公式等。请以markdown格式返回，保持原文的层次结构和格式。只输出你提取出的所有信息，不要提供其他信息。输出的markdown不需要用```markdown包裹。")
-        all_content.append(page_text)
-        text_only.append(page_text)
-
-        # 提取并描述图片
-        images = extract_images_from_pdf_page(page, page_num + 1, img_idx)
-        for img in images:
-            img_description = describe_image_with_qwen(img['path'], img['index'], page_num + 1)
-            all_content.append(img_description)
-        
+    try:
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            
+            # 提取文本
+            pix = page.get_pixmap(dpi=100)
+            page_image = 'pages/page_'+str(page_num+1)+'.png'
+            pix.save(page_image)
+            extract_text_from_image(page_image, f'pages/content.md', description=False, prompt="请提取图片中的所有文本内容，包括标题、正文、图表标题、公式等。请以markdown格式返回，保持原文的层次结构和格式。只输出你提取出的所有信息，不要提供其他信息。输出的markdown不需要用```markdown包裹。")
+            # 提取并描述图片
+            images = extract_images_from_pdf_page(page, page_num + 1, img_idx)
+            for img in images:
+                describe_image_with_qwen(img['path'], img['index'])
+    except Exception as e:
+            print("提取图片文本时出错: ",  e)
         
     
     doc.close()

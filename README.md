@@ -11,3 +11,5 @@
 0707 遇到paddle与torch的冲突问题
 解决https://github.com/PaddlePaddle/Paddle/issues/66947
 没办法解决，放弃使用paddle，使用vlm（qwen）进行pdf解析提取，目前又面临图片的准确提取问题，向量化存储和图片描述解决
+0708
+向量化部分改进，chunk部分细化，qwen改用流式输出避免超时问题

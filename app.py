@@ -60,25 +60,26 @@ def main():
             with st.spinner("正在提取PDF内容"):
 
                 
-                # # 提取文本和图片描述
-                # combined_content, text_only = extract_text_and_images_from_pdf(pdf_path)
+                # 提取文本和图片描述
+                # 保存完整内容
+                # extract_text_and_images_from_pdf(pdf_path)
                 
-                # # 保存到session_state
-                # st.session_state['pdf_text'] = text_only
-                # st.session_state['pdf_file_name'] = uploaded_file.name
+                os.makedirs('pages', exist_ok=True)
+                with open(f'pages/content.md', 'r', encoding='utf-8') as f:
+                    text_only = f.read()
+                # 保存到session_state
+                st.session_state['pdf_text'] = text_only
+                st.session_state['pdf_file_name'] = uploaded_file.name
                 
-                # # 保存完整内容
-                # complete_text_path = f'pages/complete_text_with_images.md'
-                # os.makedirs('pages', exist_ok=True)
-                # with open(complete_text_path, 'w', encoding='utf-8') as f:
-                #     f.write(combined_content)
-                # st.success(f"已保存完整内容: {complete_text_path}")
                 
-                # # 文本向量化
+                # 文本向量化
                 # st.session_state['chunks'] = text_chunking(st.session_state['pdf_text'])
                 # embeddings = HuggingFaceEmbeddings(model_name="shibing624/text2vec-base-multilingual")
                 # vectorstore = Chroma.from_documents(documents=st.session_state['chunks'], embedding=embeddings, persist_directory="./chroma_db")
                 # print("vectordb:", vectorstore._collection.count())    
+               
+               
+               
                 # 显示提取的内容
                 # st.header("📝 提取的内容（包含图片描述）")
                 # with st.expander("查看提取的内容", expanded=False):
@@ -92,9 +93,10 @@ def main():
                 #     for img in images:
                 #         st.write(f"图片 {img['number']}: {img['description'][:100]}...")
                 
-                
-                with open('./pages/complete_text_with_images.md', 'r', encoding='utf-8') as f:
-                    markdown_text = f.read()
+                markdown_text = st.session_state['pdf_text']
+                with open('./pages/img_descriptions.md', 'r', encoding='utf-8') as f:
+                    img_descriptions = f.read()
+                markdown_text += img_descriptions
                 st.session_state['pdf_text'] = markdown_text
                 st.session_state['pdf_file_name'] = uploaded_file.name
 
@@ -150,8 +152,7 @@ def main():
             if question:
                 if st.button("提交问题"):
                     with st.spinner("正在思考..."):
-                        with open('./pages/complete_text_with_images.md', 'r', encoding='utf-8') as f:
-                            markdown_text = f.read()
+                        markdown_text = st.session_state['pdf_text']
                         answer, evidence, is_image_question = ask_question(markdown_text, question)
                         if is_image_question:
                             col1, col2 = st.columns([1, 1])

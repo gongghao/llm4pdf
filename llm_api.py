@@ -3,7 +3,6 @@ import re
 import os
 from typing import Tuple, List
 from chromadb.utils import embedding_functions
-from vector_search import extract_keywords_from_question
 from real_llm_api import call_llm_api, init_llm
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -33,7 +32,7 @@ def extract_relevant_context(question: str):
     # keywords = extract_keywords_by_llm(question, lang="en")  # 或lang="zh"
     embedding = HuggingFaceEmbeddings(model_name="shibing624/text2vec-base-multilingual")
     vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embedding)
-    docs = vectorstore.similarity_search(question, k=3)
+    docs = vectorstore.similarity_search(question, k=5)
     
     return docs
     
@@ -51,7 +50,7 @@ def get_summary(text: str) -> str:
     4. 用中文回答，语言简洁明了
     
     文献内容：
-    {text[:3000]}...
+    {text}...
     """
     
     # 调用真实的大模型API
@@ -109,8 +108,17 @@ def ask_question(text: str, question: str) -> Tuple[str, str, bool]:
     docs = extract_relevant_context(question)
     relevant_context = [doc.page_content for doc in docs]
     evidence = ""
-    for context in relevant_context:
-        evidence += context
+    for i, context in enumerate(relevant_context):        
+        evidence += f"原文片段{i+1}：\n"
+        if docs[i].metadata.get('h4'):
+            evidence += f"**{docs[i].metadata['h4']}** \n\n"
+        elif docs[i].metadata.get('h3'):
+            evidence += f"**{docs[i].metadata['h3']}** \n\n"
+        elif docs[i].metadata.get('h2'):
+            evidence += f"**{docs[i].metadata['h2']}** \n\n"
+            
+        evidence += f"{context}"
+        evidence += "\n\n"
            
     # return relevant_context, relevant_context, False
     # 2. 构建提示词
