@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import subprocess
 import fitz
 from llm_api import get_summary, ask_question, setup_llm_api, setup_vlm_api
 import re
@@ -8,7 +9,8 @@ from text_util import text_chunking
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
-from pdf_parser import  extract_text_and_images_from_pdf   
+from pdf_parser import  describe_image_with_qwen
+from pdf_parser_ocr import PDFParser
 
 os.environ['HTTP_PROXY'] = 'http://127.0.0.1:7890'
 os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
@@ -63,6 +65,17 @@ def main():
                 # 提取文本和图片描述
                 # 保存完整内容
                 # extract_text_and_images_from_pdf(pdf_path)
+
+
+                subprocess.run(['python', 'pdf_parser_ocr.py', pdf_path])
+                # 打开imgs并读取所有文件
+                # 让vlm对图片进行解读
+                imgs = []
+                for file in os.listdir('imgs'):
+                    imgs.append(f'imgs/{file}')
+                for img in imgs:
+                    describe_image_with_qwen(img, 1)
+
                 
                 os.makedirs('pages', exist_ok=True)
                 with open(f'pages/content.md', 'r', encoding='utf-8') as f:
@@ -72,11 +85,11 @@ def main():
                 st.session_state['pdf_file_name'] = uploaded_file.name
                 
                 
-                # 文本向量化
-                # st.session_state['chunks'] = text_chunking(st.session_state['pdf_text'])
-                # embeddings = HuggingFaceEmbeddings(model_name="shibing624/text2vec-base-multilingual")
-                # vectorstore = Chroma.from_documents(documents=st.session_state['chunks'], embedding=embeddings, persist_directory="./chroma_db")
-                # print("vectordb:", vectorstore._collection.count())    
+                # # 文本向量化
+                st.session_state['chunks'] = text_chunking(st.session_state['pdf_text'])
+                embeddings = HuggingFaceEmbeddings(model_name="shibing624/text2vec-base-multilingual")
+                vectorstore = Chroma.from_documents(documents=st.session_state['chunks'], embedding=embeddings, persist_directory="./chroma_db")
+                print("vectordb:", vectorstore._collection.count())    
                
                
                
@@ -107,6 +120,7 @@ def main():
             #     st.header("🖼️ PDF图片")
             #     cols = st.columns(3)
             #     img_count = 0
+            
             #     for page_dict in st.session_state['figures']:
             #         if isinstance(page_dict, dict) and page_dict:
             #             for path, image in page_dict.items():

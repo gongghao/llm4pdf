@@ -11,4 +11,5 @@ langchain
 langchain-openai
 sentence-transformers==2.4.0
 chromadb
+modelscope
 torch==2.7.1

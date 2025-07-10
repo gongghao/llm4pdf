@@ -69,8 +69,9 @@ def ask_question(text: str, question: str) -> Tuple[str, str, bool]:
     {question}
     """
     answer = call_llm_api(prompt)
+
+
     print(answer)
-    img_num_all = 0
     # 解析返回的字符串格式
     try:
         parts = answer.split(',')
@@ -79,24 +80,23 @@ def ask_question(text: str, question: str) -> Tuple[str, str, bool]:
         if len(parts) == 2:    
             if page_num == 0 and img_num > 0:
                 # 询问第n张图片
-                for file in os.listdir('temp_images'):
-                    if file.endswith('.png'):
-                        img_num_all += 1
-                        if img_num_all == img_num:
-                            img_path = os.path.join('temp_images', file)
-                            part_name = file.split('_')
-                            description = extract_specific_image_description(text, int(part_name[3]), int(part_name[1]))
-                            return description, img_path, True
+                for file in os.listdir('imgs'):
+                    img_path = os.path.join('imgs', file)
+                    part_name = file.split('_')
+                    img_idx = part_name[4].split('.')[0]
+                    if int(img_idx) == img_num:
+                        description = extract_specific_image_description(text, int(part_name[3]), int(part_name[1]))
+                        return description, img_path, True
 
 
             elif page_num > 0 and img_num > 0:
                 # 询问第m页第n张图片
-                for file in os.listdir('temp_images'):
+                for file in os.listdir('imgs'):
                     if file.endswith('.png'):
                         part_name = file.split('_')
 
                         if part_name[1] == str(page_num) and part_name[3] == str(img_num):
-                            img_path = os.path.join('temp_images', file)
+                            img_path = os.path.join('imgs', file)
                             part_name = file.split('_')
                             description = extract_specific_image_description(text, int(part_name[3]), int(part_name[1]))
                             return description, img_path, True
