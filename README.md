@@ -28,6 +28,27 @@
 pip install -r requirements.txt
 ```
 
+### API密钥配置
+
+在使用系统前，需要配置相关API密钥。打开 `app.py` 文件，找到以下代码行并替换为你的实际API密钥：
+
+```python
+# 在 app.py 第35-36行
+setup_vlm_api("qwen_apikey")  # 请替换为你的实际Qwen API密钥
+setup_llm_api("deepseek", "deepseek_apikey")  # 请替换为你的实际DeepSeek API密钥
+```
+
+**配置步骤：**
+1. 获取API密钥：
+   - DeepSeek API密钥：访问 [DeepSeek官网](https://platform.deepseek.com/) 申请
+   - Qwen API密钥：访问 [阿里云通义千问](https://dashscope.console.aliyun.com/) 申请
+
+2. 替换密钥：
+   - 将 `"qwen_apikey"` 替换为你的Qwen API密钥
+   - 将 `"deepseek_apikey"` 替换为你的DeepSeek API密钥
+
+**注意**：请确保API密钥的安全性，不要将其提交到版本控制系统中。建议在提交代码前将API密钥替换为占位符。
+
 ### 运行应用
 
 ```bash

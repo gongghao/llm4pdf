@@ -32,8 +32,8 @@ def main():
     # VLM API密钥配置
     # 这里填写你的API类型和密钥
     if os.environ.get('VLM_API_KEY') is None:
-        setup_vlm_api("sk-95e87a0b2dee40e0b5ae7ae8ac2161ca")  # 请替换为你的实际API密钥
-        setup_llm_api("deepseek", "sk-2766c2e985dc4b568207f647a0056052")
+        setup_vlm_api("qwen_apikey")  # 请替换为你的实际API密钥
+        setup_llm_api("deepseek", "deepseek_apikey")
     st.title("📚 PDF文档智能解读系统")
     
     # 侧边栏：PDF上传
